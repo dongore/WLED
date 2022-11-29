@@ -7029,6 +7029,113 @@ uint16_t mode_rocktaves(void) {                 // Rocktaves. Same note from eac
 static const char _data_FX_MODE_ROCKTAVES[] PROGMEM = "Rocktaves@;!,!;!;1f;m12=1,si=0"; // Bar, Beatsin
 
 
+uint16_t mode_whiskyroulette()
+{
+  const uint16_t WHYSKY_SPACE = 3;
+  const uint16_t WHISKY_WIDTH = 4;
+  const uint16_t WHISKY_END = 1;
+  const uint16_t WHISKY_NUMBER = 10;
+  uint16_t wLength = (WHISKY_NUMBER*(WHISKY_WIDTH+WHYSKY_SPACE)-WHYSKY_SPACE) + WHISKY_END;
+  if (wLength > SEGLEN) return mode_static(); //bail if segment too short
+
+  SEGMENT.fill(SEGCOLOR(1)); //fill background
+
+  uint8_t state = SEGENV.aux1 >> 8;
+  bool stop = false;
+  uint16_t stateTime2 = SEGENV.call;
+  if (stateTime2 == 0) stateTime2 = 1;
+  uint16_t stateTime = 5*pow(1.01,SEGENV.call)-4;
+  if (stateTime > 800) stateTime = 800; //1500/574
+  if (stateTime2 > 510) stateTime2 = 510;
+  if (stateTime > 600) stop = true;
+  uint32_t c = SEGMENT.color_from_palette(1 & 0xFF, false, false, 0);
+  uint32_t c2 = 0xFF00FF00;
+
+  if (state == 0) { //spawn eyes
+    SEGENV.aux0 = random8(0, WHISKY_NUMBER-1); //start pos
+    SEGENV.aux1 = random8(0,9); //color
+    state = 1;
+    c = SEGMENT.color_from_palette(1 & 0xFF, false, false, 0);
+  }
+  
+  if (state == 1) { //spawn eyes
+    SEGENV.aux0 = (SEGENV.aux0 + WHISKY_NUMBER - 1) % WHISKY_NUMBER; //start pos
+    //SEGENV.aux1 = random8(); //color
+    state = 2;
+  }
+
+  uint16_t startPos    = SEGLEN - WHISKY_END - (SEGENV.aux0)*(WHYSKY_SPACE+WHISKY_WIDTH)-WHISKY_WIDTH;
+  //uint16_t startPos    = WHISKY_END + SEGENV.aux0*(WHYSKY_SPACE+WHISKY_WIDTH);
+  //uint32_t fadestage = (now - SEGENV.step)*255 / stateTime;
+  //if (fadestage > 255) fadestage = 255;
+
+  if (state == 2) { //fade eyes
+    for (uint16_t i = 0; i < WHISKY_WIDTH; i++)
+    {
+      SEGMENT.setPixelColor(startPos + i, c);
+    }
+  }
+
+  if (strip.now - SEGENV.step > stateTime)
+  {
+    //state++;
+    if (state == 2)
+    {
+      state = 1;
+      stateTime2 = stateTime2 + 1;
+      if ((SEGENV.aux1 & 0xFF) != 0x0 && stop) SEGENV.aux1 = (SEGENV.aux1 & 0xFF) - 1;
+      if (SEGENV.aux1 == 0x0) state = 3;
+    }
+
+ /*   if(state > 3)
+    {
+       for (uint16_t i = 0; i < WHISKY_WIDTH; i++)
+      {
+        setPixelColor(startPos    + i, 0xFF00FF00);
+      } 
+      state = 4;
+    }*/
+    
+    /* if (state < 3)
+    {
+      stateTime = 100 + (255 - SEGMENT.intensity)*10; //eye fade time
+      stateTime = 1;
+    } else {
+      uint16_t eyeOffTimeBase = (255 - SEGMENT.speed)*10;
+      stateTime = eyeOffTimeBase + random16(eyeOffTimeBase);
+      stateTime = 1;
+    } */
+    SEGENV.step = strip.now;
+    SEGENV.call = stateTime2;
+  }
+
+  if (state == 3) { //fade eyes
+    uint32_t fadestage = (strip.now - SEGENV.step)*255 / stateTime;
+    if (fadestage > 230) fadestage = 255;
+    c2 = color_blend(SEGMENT.color_from_palette(1 & 0xFF, false, false, 0), 0xFF00FF00, fadestage);
+    if ((c2 & 0x00FFFFFF) == 0x0000FF00) state = 4;
+        
+    for (uint16_t i = 0; i < WHISKY_WIDTH; i++)
+    {
+      SEGMENT.setPixelColor(startPos    + i, c2);
+    }
+  }
+
+  if (state == 4) { //fade eyes
+    for (uint16_t i = 0; i < WHISKY_WIDTH; i++)
+    {
+      SEGMENT.setPixelColor(startPos    + i, c2);
+      //setPixelColor(1    + i, 0xFFFF0000);
+    }
+  }
+
+  SEGENV.aux1 = (SEGENV.aux1 & 0xFF) + (state << 8); //save state
+  
+  return FRAMETIME;
+}
+static const char _data_FX_MODE_WHISKYROULETTE[] PROGMEM = "Whisky Roulette@Duration,Eye fade time;!,!;!;12";
+
+
 ///////////////////////
 //   ** Waterfall    //
 ///////////////////////
@@ -7489,6 +7596,8 @@ void WS2812FX::setupEffectData() {
 
   addEffect(FX_MODE_WAVESINS, &mode_wavesins, _data_FX_MODE_WAVESINS);
   addEffect(FX_MODE_ROCKTAVES, &mode_rocktaves, _data_FX_MODE_ROCKTAVES);
+
+  addEffect(FX_MODE_WHISKYROULETTE, &mode_whiskyroulette, _data_FX_MODE_WHISKYROULETTE);
 
   // --- 2D  effects ---
 #ifndef WLED_DISABLE_2D
